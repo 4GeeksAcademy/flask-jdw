@@ -21,6 +21,7 @@ export const Home = () => {
 					Read documentation
 				</a>
 			</p>
+			<form> <input ></input></form>
 		</div>
 	);
 };

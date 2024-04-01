@@ -20,3 +20,19 @@ def handle_hello():
     }
 
     return jsonify(response_body), 200
+
+
+@api.route('/token', methods=['POST'])
+def generate_token():
+    data = request.json 
+    email = data.get('email')
+    password = data.get('password')
+
+    user = User.query.filter_by(email=email, password=password).first()
+
+    if user:
+        # Here you would typically generate a JWT token and return it in the response
+        # For simplicity, let's assume we're just returning a success message
+        return jsonify({'message': 'Token generated successfully'})
+    else:
+        return jsonify({'message': 'Invalid email or password'}), 401
