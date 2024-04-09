@@ -1,32 +1,57 @@
 import React, { useState } from 'react';
+import { useHistory } from 'react-router-dom';
 
-function LoginForm() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+function Login() {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const history = useHistory();
+
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!formData.email || !formData.password) {
+      alert('Please fill out all fields');
+      return;
+    }
 
     try {
-      // Make a request to your backend server to authenticate the user
-      const response = await fetch('/api/login', {
+      const response = await fetch('http://your-backend-api-url/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(formData),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        // Redirect the user to the dashboard or authenticated page
-        window.location.href = '/dashboard';
+        // Reset form data
+        setFormData({
+          email: '',
+          password: '',
+        });
+
+        // Redirect to home page (or any other desired page)
+        history.push('/private');
       } else {
-        // Handle authentication errors
-        setError('Invalid username or password');
+        // Handle authentication error
+        alert(data.message || 'Login failed. Please try again.');
       }
     } catch (error) {
       console.error('Error:', error);
+      alert('An error occurred. Please try again later.');
     }
   };
 
@@ -35,26 +60,27 @@ function LoginForm() {
       <h2>Login</h2>
       <form onSubmit={handleSubmit}>
         <div>
-          <label>Username:</label>
+          <label>Email:</label>
           <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
           />
         </div>
         <div>
           <label>Password:</label>
           <input
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            name="password"
+            value={formData.password}
+            onChange={handleInputChange}
           />
         </div>
         <button type="submit">Login</button>
       </form>
-      {error && <p>{error}</p>}
     </div>
   );
 }
 
-export default LoginForm;
+export default Login;

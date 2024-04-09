@@ -1,60 +1,27 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
+import { Route, Redirect } from 'react-router-dom';
 
-function LoginForm() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      // Make a request to your backend server to authenticate the user
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (response.ok) {
-        // Redirect the user to the dashboard or authenticated page
-        window.location.href = '/dashboard';
-      } else {
-        // Handle authentication errors
-        setError('Invalid username or password');
-      }
-    } catch (error) {
-      console.error('Error:', error);
+const PrivateRoute = ({ component: Component, ...rest }) => {
+  useEffect(() => {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      // Redirect to login if token is not present
+      window.location.href = '/login';
     }
-  };
+  }, []);
 
   return (
-    <div>
-      <h2>Sign Up!</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Username:</label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </div>
-        <div>
-          <label>Password:</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-        <button type="submit">Submit</button>
-      </form>
-      {error && <p>{error}</p>}
-    </div>
+    <Route
+      {...rest}
+      render={(props) =>
+        sessionStorage.getItem('token') ? (
+          <Component {...props} />
+        ) : (
+          <Redirect to="/login" />
+        )
+      }
+    />
   );
-}
+};
 
-export default LoginForm;
+export default PrivateRoute;

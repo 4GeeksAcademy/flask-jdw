@@ -1,74 +1,55 @@
-"""
-This module takes care of starting the API Server, Loading the DB and Adding the endpoints
-"""
-import os
-from flask import Flask, request, jsonify, url_for, send_from_directory
-from flask_migrate import Migrate
-from flask_swagger import swagger
-from api.utils import APIException, generate_sitemap
-from api.models import db
-from api.routes import api
-from api.admin import setup_admin
-from api.commands import setup_commands
+from flask import Flask, jsonify, request
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from passlib.hash import pbkdf2_sha256 as sha256
 
-# from models import Person
-
-ENV = "development" if os.getenv("FLASK_DEBUG") == "1" else "production"
-static_file_dir = os.path.join(os.path.dirname(
-    os.path.realpath(__file__)), '../public/')
 app = Flask(__name__)
-app.url_map.strict_slashes = False
+app.config['JWT_SECRET_KEY'] = 'your_secret_key'  # Change this to your own secret key
+jwt = JWTManager(app)
 
-# database condiguration
-db_url = os.getenv("DATABASE_URL")
-if db_url is not None:
-    app.config['SQLALCHEMY_DATABASE_URI'] = db_url.replace(
-        "postgres://", "postgresql://")
-else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:////tmp/test.db"
+# Mock user data (for demonstration purposes)
+users = [
+    {'id': 1, 'username': 'user1', 'password': '$pbkdf2-sha256$29000$3VMfqfg3k7fe47guVhjrwQ$1A9VSMqgxzsoiU6Z01EnTAWIhNhoY89nN7N5BfV62Rk'},
+    {'id': 2, 'username': 'user2', 'password': '$pbkdf2-sha256$29000$x6nukz1xYhnlIKtpWlWlvA$jvxBkpkHYVXfL.lT13gEd8pEQC0rLUzZ5tGmqqLWqdo'}
+]
 
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-MIGRATE = Migrate(app, db, compare_type=True)
-db.init_app(app)
+# Authentication endpoint
+@app.route('/login', methods=['POST'])
+def login():
+    username = request.json.get('username')
+    password = request.json.get('password')
 
-# add the admin
-setup_admin(app)
+    user = next((user for user in users if user['username'] == username), None)
 
-# add the admin
-setup_commands(app)
+    if not user or not sha256.verify(password, user['password']):
+        return jsonify({'message': 'Invalid username or password'}), 401
 
-# Add all endpoints form the API with a "api" prefix
-app.register_blueprint(api, url_prefix='/api')
+    access_token = create_access_token(identity=user['id'])
+    return jsonify({'access_token': access_token}), 200
 
-# Handle/serialize errors like a JSON object
+# Signup endpoint
+@app.route('/signup', methods=['POST'])
+def signup():
+    username = request.json.get('username')
+    password = request.json.get('password')
 
+    if not username or not password:
+        return jsonify({'message': 'Username and password are required'}), 400
 
-@app.errorhandler(APIException)
-def handle_invalid_usage(error):
-    return jsonify(error.to_dict()), error.status_code
+    if next((user for user in users if user['username'] == username), None):
+        return jsonify({'message': 'Username already exists'}), 400
 
-# generate sitemap with all your endpoints
+    hashed_password = sha256.hash(password)
+    new_user = {'id': len(users) + 1, 'username': username, 'password': hashed_password}
+    users.append(new_user)
 
+    return jsonify({'message': 'User created successfully'}), 201
 
-@app.route('/')
-def sitemap():
-    if ENV == "development":
-        return generate_sitemap(app)
-    return send_from_directory(static_file_dir, 'index.html')
+# Protected route
+@app.route('/private', methods=['GET'])
+@jwt_required()
+def private():
+    current_user = get_jwt_identity()
+    return jsonify(logged_in_as=current_user), 200
 
-# any other endpoint will try to serve it like a static file
-
-
-@app.route('/<path:path>', methods=['GET'])
-def serve_any_other_file(path):
-    if not os.path.isfile(os.path.join(static_file_dir, path)):
-        path = 'index.html'
-    response = send_from_directory(static_file_dir, path)
-    response.cache_control.max_age = 0  # avoid cache memory
-    return response
-
-
-# this only runs if `$ python src/main.py` is executed
 if __name__ == '__main__':
-    PORT = int(os.environ.get('PORT', 3001))
-    app.run(host='0.0.0.0', port=PORT, debug=True)
+    app.run(debug=True)
